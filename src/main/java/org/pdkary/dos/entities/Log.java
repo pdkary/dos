@@ -21,12 +21,12 @@ import lombok.ToString;
 public class Log {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	public Long id;
-	public Date date;
-	public int intHour;
-	public int intValue;
+	private Long id;
+	private Date date;
+	private int intHour;
+	private int intValue;
 	
 	@ManyToOne
 	@JoinColumn(name="patient_id")
-	public @NonNull Patient patient;
+	private @NonNull Patient patient;
 }

@@ -6,14 +6,16 @@ import java.text.SimpleDateFormat;
 
 public class DosStringUtils {
 	
-	public static SimpleDateFormat dosDateFormat = new SimpleDateFormat("dd-MM-yyy");
+	public static final String DATE_FORMAT_STR = "dd-MM-yyy";
 	
 	public static Date toSqlDate(String strDate) throws ParseException {
+		SimpleDateFormat dosDateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
 		java.util.Date utilDate = dosDateFormat.parse(strDate);
 		return new Date(utilDate.getTime());
 	}
 	
 	public static String fromSqlDate(Date sqlDate) {
+		SimpleDateFormat dosDateFormat = new SimpleDateFormat(DATE_FORMAT_STR);
 		return dosDateFormat.format(sqlDate);
 	}
 	

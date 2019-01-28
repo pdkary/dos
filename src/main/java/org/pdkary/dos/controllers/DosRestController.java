@@ -2,11 +2,11 @@ package org.pdkary.dos.controllers;
 
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.sql.Date;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import javax.servlet.http.HttpServletResponse;
 
@@ -28,6 +28,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestController
 public class DosRestController {
 
@@ -38,7 +41,7 @@ public class DosRestController {
 	private LogRepository logRepository;
 
 	@Autowired
-	private ExcelWriter csvWriter;
+	private ExcelWriter excelWriter;
 
 	@GetMapping("/")
 	public String home() {
@@ -48,34 +51,40 @@ public class DosRestController {
 	@PostMapping(path = "/input-patient", consumes = "application/json")
 	public void enterPatient(@RequestBody PatientInputDto dto) {
 		Patient patient = new Patient();
-		patient.strFirstName = dto.firstName;
-		patient.strLastName = dto.lastName;
-		patient.intAge = dto.age;
-		patient.strInfo = dto.info;
+		patient.setStrFirstName(dto.firstName);
+		patient.setStrLastName(dto.lastName);
+		patient.setIntAge(dto.age);
+		patient.setStrInfo(dto.info);
 		patientRepository.save(patient);
 	}
 
 	@PostMapping(path = "/input-log", consumes = "application/json")
 	public void enterLog(@RequestBody SingleLogDto dto) throws ParseException {
 		Log log = new Log();
-		log.date = DosStringUtils.toSqlDate(dto.date);
-		log.intHour = DosStringUtils.toDosTime(dto.hour);
-		log.intValue = dto.value;
-		log.patient = patientRepository.findById(dto.patientId).get();
-		logRepository.save(log);
-	}
-	
-	@PostMapping(path="/input-logs", consumes="application/json")
-	public void enterLogs(@RequestBody MultiLogDto dto) throws ParseException {
-		for(int i=0;i<dto.hours.length;i++) {
-			Log log = new Log();
-			log.date = DosStringUtils.toSqlDate(dto.date);
-			log.intHour = DosStringUtils.toDosTime(dto.hours[i]);
-			log.intValue = dto.values[i];
-			log.patient = patientRepository.findById(dto.patientId).get();
+		log.setDate(DosStringUtils.toSqlDate(dto.date));
+		log.setIntHour(DosStringUtils.toDosTime(dto.hour));
+		log.setIntValue(dto.value);
+		Optional<Patient> p = patientRepository.findById(dto.patientId);
+		if (p.isPresent()) {
+			log.setPatient(p.get());
 			logRepository.save(log);
 		}
-			
+	}
+
+	@PostMapping(path = "/input-logs", consumes = "application/json")
+	public void enterLogs(@RequestBody MultiLogDto dto) throws ParseException {
+		for (int i = 0; i < dto.hours.length; i++) {
+			Log log = new Log();
+			log.setDate(DosStringUtils.toSqlDate(dto.date));
+			log.setIntHour(DosStringUtils.toDosTime(dto.hours[i]));
+			log.setIntValue(dto.values[i]);
+			Optional<Patient> p = patientRepository.findById(dto.patientId);
+			if (p.isPresent()) {
+				log.setPatient(p.get());
+				logRepository.save(log);
+			}
+		}
+
 	}
 
 	@GetMapping("/id")
@@ -102,7 +111,10 @@ public class DosRestController {
 			@RequestParam(required = false) String firstName) {
 		List<Patient> patients = new ArrayList<Patient>();
 		if (pId != null) {
-			patients.add(patientRepository.findById(pId).get());
+			Optional<Patient> p = patientRepository.findById(pId);
+			if (p.isPresent()) {
+				patients.add(p.get());
+			}
 		} else if (lastName != null && firstName != null) {
 			patients = patientRepository.findByStrFirstNameAndStrLastName(firstName, lastName);
 		} else if (lastName != null && firstName == null) {
@@ -116,26 +128,32 @@ public class DosRestController {
 	@GetMapping("/logs")
 	public String getLogs(@RequestParam Long pId) {
 		String m = "";
-		Patient patient = patientRepository.findById(pId).get();
-		List<Log> logs = logRepository.findByPatient(patient);
-		for (Log l : logs) {
-			m += l.toString() + "\n";
+		Optional<Patient> p = patientRepository.findById(pId);
+		if (p.isPresent()) {
+			List<Log> logs = logRepository.findByPatient(p.get());
+			for (Log l : logs) {
+				m += l.toString() + "\n";
+			}
 		}
 		return m;
 	}
 
 	@GetMapping("/excel")
 	public void getExcel(@RequestParam Long pId, @RequestParam String date, HttpServletResponse response)
-			throws ParseException, IOException {
+			throws ParseException {
 		response.setContentType("text/csv");
-		Patient patient = patientRepository.findById(pId).get();
-		Date sqlDate = DosStringUtils.toSqlDate(date);
-
-		CsvDto csvDto = csvWriter.WriteSingleDay(patient, sqlDate);
-		InputStream inputStream = new FileInputStream(csvDto.filePath);
-		response.setHeader("Content-disposition", "attachment; filename="+ csvDto.fileName);
-
-		IOUtils.copy(inputStream, response.getOutputStream());
-		response.flushBuffer();
+		Optional<Patient> patient = patientRepository.findById(pId);
+		if (patient.isPresent()) {
+			Date sqlDate = DosStringUtils.toSqlDate(date);
+			CsvDto csvDto = excelWriter.getExcelDto(patient.get(), sqlDate);
+			try (FileInputStream inputStream = new FileInputStream(csvDto.filePath)) {
+				excelWriter.WriteSingleDay(patient.get(), sqlDate);
+				IOUtils.copy(inputStream, response.getOutputStream());
+				response.flushBuffer();
+				response.setHeader("Content-disposition", "attachment; filename=" + csvDto.fileName);
+			} catch (IOException e) {
+				log.error("An Error occured while generating excel file", e);
+			}
+		}
 	}
 }

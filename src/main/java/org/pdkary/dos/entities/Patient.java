@@ -20,13 +20,13 @@ import lombok.ToString;
 public class Patient {
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	public Long id;
+	private Long id;
 
-	public String strFirstName;
-	public String strLastName;
-	public int intAge;
-	public String strInfo;
+	private String strFirstName;
+	private String strLastName;
+	private int intAge;
+	private String strInfo;
 	
 	@OneToMany(mappedBy="patient",targetEntity=Log.class, cascade = CascadeType.ALL)
-	public Set<Log> logs;
+	private Set<Log> logs;
 }

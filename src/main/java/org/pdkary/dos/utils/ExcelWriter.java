@@ -22,25 +22,23 @@ import org.pdkary.dos.repositories.LogRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 
 public class ExcelWriter {
-	public static String BASE_PATH = "C:\\Users\\Parker\\Documents\\github\\logs\\";
+	private static final String BASE_PATH = "C:\\Users\\Parker\\Documents\\github\\logs\\";
 
 	@Autowired
 	private LogRepository logRepository;
 
-	public CsvDto WriteSingleDay(Patient patient, Date sqlDate) throws IOException {
-		String fileName = patient.strFirstName + "-" + patient.strLastName + "-" + DosStringUtils.fromSqlDate(sqlDate)
-				+ ".xlsx";
-		String filePath = BASE_PATH + fileName;
-
+	public void WriteSingleDay(Patient patient, Date sqlDate) throws IOException {
+		CsvDto excelDto = getExcelDto(patient, sqlDate);
+		
 		Workbook workbook = new XSSFWorkbook();
-		Sheet sheet = workbook.createSheet(fileName);
+		Sheet sheet = workbook.createSheet(excelDto.fileName);
 
 		ArrayList<String[]> lines = new ArrayList<String[]>();
 
 		lines.add(new String[] { "Time", "Value", "\n" });
 		List<Log> logs = logRepository.findByPatientAndDate(patient, sqlDate);
 		Map<Integer, Integer> values = new HashMap<Integer, Integer>();
-		logs.forEach(log -> values.put(log.intHour, log.intValue));
+		logs.forEach(log -> values.put(log.getIntHour(), log.getIntValue()));
 
 		for (int i = 0; i < 48; i++) {
 			int index = (i + 15) % 49;
@@ -52,17 +50,23 @@ public class ExcelWriter {
 				CellStyle cellStyle = workbook.createCellStyle();
 				cellStyle.setFillForegroundColor(CellColor.get(values.get(index)));
 				cellStyle.setFillPattern(CellStyle.SOLID_FOREGROUND);
-				
+
 				cell1.setCellValue(values.get(index));
 				cell1.setCellStyle(cellStyle);
 			} else {
 				cell1.setCellValue(0);
 			}
 		}
-		
-		FileOutputStream fos = new FileOutputStream(filePath);
+
+		FileOutputStream fos = new FileOutputStream(excelDto.filePath);
 		workbook.write(fos);
 		fos.close();
+	}
+
+	public CsvDto getExcelDto(Patient patient, Date sqlDate) {
+		String fileName = patient.getStrFirstName() + "-" + patient.getStrLastName() + "-" + DosStringUtils.fromSqlDate(sqlDate)
+				+ ".xlsx";
+		String filePath = BASE_PATH + fileName;
 		CsvDto csvDto = new CsvDto(filePath, fileName);
 		return csvDto;
 	}
